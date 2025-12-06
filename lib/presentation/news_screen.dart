@@ -17,29 +17,52 @@ class _NewsScreenState extends State<NewsScreen> {
   List<SectionModel> contentDetails = [];
   bool isLoading = false;
 
+  String? errorMessage;
+
   Future<void> getSectionDetails() async {
     setState(() {
       isLoading = true;
+      errorMessage = null;
     });
 
-    final response = await http.get(
-      Uri.parse(
-        ApiRequests.contentUrl(widget.sectionId),
-      ),
-    );
-
-    if (response.statusCode == 200) {
-      final decodedToken = jsonDecode(response.body);
-      final content = decodedToken["response"]["results"];
-
-      final articles = List<SectionModel>.from(
-        content.map((item) => SectionModel.fromJson(item)),
+    try {
+      final response = await http.get(
+        Uri.parse(
+          ApiRequests.contentUrl(widget.sectionId),
+        ),
       );
 
+      if (response.statusCode == 200) {
+        final decodedToken = jsonDecode(response.body);
+        final content = decodedToken["response"]["results"];
+
+        final articles = List<SectionModel>.from(
+          content.map((item) => SectionModel.fromJson(item)),
+        );
+
+        if (!mounted) return;
+        setState(() {
+          contentDetails = articles;
+        });
+      } else {
+        if (!mounted) return;
+        setState(() {
+          errorMessage =
+              'Failed to load articles. Status: ${response.statusCode}';
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching section details: $e");
+      if (!mounted) return;
       setState(() {
-        contentDetails = articles;
-        isLoading = false;
+        errorMessage = "An error occurred: $e";
       });
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
   }
 
@@ -56,26 +79,43 @@ class _NewsScreenState extends State<NewsScreen> {
         title: Text('News - ${widget.sectionId}'),
       ),
       body: isLoading
-          ? Center(child: CircularProgressIndicator())
-          : ListView.builder(
-              itemCount: contentDetails.length,
-              itemBuilder: (context, index) {
-                final content = contentDetails[index];
-                return ListTile(
-                  title: Text(content.webTitle),
-                  subtitle: Text(content.id),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            ArticleWebView(url: content.webUrl),
+          ? const Center(child: CircularProgressIndicator())
+          : errorMessage != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(errorMessage!, textAlign: TextAlign.center),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: getSectionDetails,
+                        child: const Text('Retry'),
                       ),
-                    );
-                  },
-                );
-              },
-            ),
+                    ],
+                  ),
+                )
+              : contentDetails.isEmpty
+                  ? const Center(child: Text("No Articles Found"))
+                  : ListView.builder(
+                      itemCount: contentDetails.length,
+                      itemBuilder: (context, index) {
+                        final content = contentDetails[index];
+                        return ListTile(
+                          minVerticalPadding: 16,
+                          title: Text(content.webTitle),
+                          subtitle: Text(content.id),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    ArticleWebView(url: content.webUrl),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
     );
   }
 }

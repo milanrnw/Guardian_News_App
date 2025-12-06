@@ -8,6 +8,7 @@ class ApiRequests {
   static final String apikey = dotenv.env['GUARDIAN_API_KEY']!;
 
   static String allSections = '${baseUrl}sections?api-key=$apikey';
-  
-  static String contentUrl(String contentId) => '${baseUrl}$contentId?api-key=$apikey';
+
+  static String contentUrl(String contentId) =>
+      '$baseUrl$contentId?api-key=$apikey';
 }
